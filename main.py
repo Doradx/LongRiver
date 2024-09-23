@@ -8,7 +8,7 @@ import shutil
 
 ####### slice data to correlated months
 from datetime import datetime, timezone, timedelta
-# Why use the running time rather than latest data timestamp? 
+# Why use the running time rather than latest data timestamp?
 # Because year-month have to be known at first due to determine file storage location in our program's logic
 yr_mth = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m")
 
@@ -26,27 +26,37 @@ for fn in listdir("./data/"):
 ####### end of slice data to correlated months
 
 def write_csv_header(data,fname_prefix):
-    with open('{}.csv'.format(fname_prefix), 'w', newline='') as f:
+    with open("{}.csv".format(fname_prefix), "w", newline="", encoding="utf-8") as f:
         headers = list(data.keys())
         csv.writer(f).writerow(headers)
 
 def write_csv_row(data,fname_prefix):
-    with open('{}.csv'.format(fname_prefix), 'a', newline='') as f:
+    with open("{}.csv".format(fname_prefix), "a", newline="", encoding="utf-8") as f:
         csv.writer(f).writerow(data.values())
 
 # LongRiverData wil be a json of summary
 if not path.isfile(store_data_full):
     LongRiverData = {}
 else:
-    with open(store_data_full, 'r') as f:
+    with open(store_data_full, "r", encoding="utf-8") as f:
         LongRiverData = json.load(f)
 
-html = requests.get('http://www.cjh.com.cn/sqindex.html').text
-river_now = json.loads(re.findall("var sssq = (.*);",html)[0])
-print(river_now)
+urls = [
+    "http://www.cjh.com.cn/sqindex.html",
+    "http://www.cjh.com.cn/sssqcwww.html",
+    "http://www.cjh.com.cn/sssqw3.html",
+]
 
+data = []
 
-for station in river_now:
+for url in urls:
+    html = requests.get(url).text
+    river_now = json.loads(re.findall("var sssq = (.*);", html)[0])
+    data.extend(river_now)
+
+print(data)
+
+for station in data:
     fname_prefix = store_data_folder + '_'.join([station['rvnm'], station['stnm']])
 
     if fname_prefix not in LongRiverData:
@@ -55,12 +65,11 @@ for station in river_now:
     if LongRiverData[fname_prefix] and LongRiverData[fname_prefix][-1]['tm'] == station['tm']:
         continue
     LongRiverData[fname_prefix].append(station)
-    
 
     if not path.isfile('{}.csv'.format(fname_prefix)):
         write_csv_header(station, fname_prefix)
     write_csv_row(station, fname_prefix)
 
 
-with open(store_data_full, 'w') as f:
+with open(store_data_full, "w", encoding="utf-8") as f:
     json.dump(LongRiverData, f, ensure_ascii=False, indent=0)
