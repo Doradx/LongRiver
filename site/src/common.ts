@@ -13,6 +13,7 @@ export interface StationSummary {
   historyStart: number;
   historyEnd: number;
   recordCount: number;
+  sparkline?: Array<[number, number]>;
 }
 
 export interface Manifest {

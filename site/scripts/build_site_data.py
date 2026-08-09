@@ -21,6 +21,8 @@ if str(ROOT) not in sys.path:
 from longriver import SOURCE_URLS  # noqa: E402
 
 DAY_MS = 86_400_000
+SPARKLINE_DAYS = 7
+SPARKLINE_POINTS = 32
 MIN_TM = 1_593_561_600_000  # 2020-07-01 00:00:00 UTC
 STANDARD_FIELDS = ("rvnm", "stnm", "z", "q", "oq", "wptn")
 ACTIVE_SOURCE_URLS = tuple(url for url in SOURCE_URLS if not url.endswith("sssqw3.html"))
@@ -54,6 +56,21 @@ def _tm(value: Any) -> int | None:
 
 def _iso(timestamp: int) -> str:
     return datetime.fromtimestamp(timestamp / 1000, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _sparkline(rows: list[dict[str, Any]]) -> list[list[int | float]]:
+    """Return a compact, time-aware water-level trend for overview cards."""
+    valid = [(row["tm"], row["z"]) for row in rows if row.get("z") is not None]
+    if not valid:
+        return []
+    recent_cutoff = valid[-1][0] - SPARKLINE_DAYS * DAY_MS
+    recent = [point for point in valid if point[0] >= recent_cutoff]
+    candidates = recent if len(recent) >= 2 else valid[-SPARKLINE_POINTS:]
+    if len(candidates) <= SPARKLINE_POINTS:
+        return [[timestamp, value] for timestamp, value in candidates]
+    last_index = len(candidates) - 1
+    indices = [round(index * last_index / (SPARKLINE_POINTS - 1)) for index in range(SPARKLINE_POINTS)]
+    return [[candidates[index][0], candidates[index][1]] for index in indices]
 
 
 def _load_snapshots(input_dir: Path, stats: Counter[str]) -> list[dict[str, Any]]:
@@ -182,6 +199,7 @@ def build(input_dir: Path, output_dir: Path, now: datetime | None = None) -> dic
             "historyStart": first_tm,
             "historyEnd": last_tm,
             "recordCount": len(station_rows),
+            "sparkline": _sparkline(station_rows),
         }
         summaries.append(summary)
         payload = {

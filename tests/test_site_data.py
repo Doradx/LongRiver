@@ -46,7 +46,9 @@ class SiteDataBuilderTests(unittest.TestCase):
             self.assertEqual(result["stats"]["duplicate_observation"], 1)
             station = json.loads((output / "stations" / "12345678.json").read_text(encoding="utf-8"))
             self.assertEqual(station["observations"][-1], [latest, 2.5, 10.0, 3.0, "5"])
-            self.assertEqual(json.loads((output / "manifest.json").read_text(encoding="utf-8"))["stationCount"], 1)
+            manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["stationCount"], 1)
+            self.assertEqual(manifest["stations"][0]["sparkline"], [[first, 2.1], [latest, 2.5]])
 
     def test_skips_invalid_rows_and_requires_valid_data(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
