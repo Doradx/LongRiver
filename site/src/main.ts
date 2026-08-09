@@ -239,20 +239,25 @@ function renderDetail(root: HTMLElement, data: StationData, echarts: typeof impo
   if (!target) return;
   const trend = trendInfo(station.wptn);
   const hasAnyFlow = data.observations.some((observation) => observation[2] !== null || observation[3] !== null);
-  const dailyCounts = countObservationsByDay(data.observations);
-  const maxDailyCount = Math.max(...dailyCounts.values());
-  const averageDailyCount = data.observations.length / Math.max(dailyCounts.size, 1);
+  const calendarEndDate = dateInputValue(station.historyEnd);
+  const calendarEnd = dateEndMs(calendarEndDate);
+  const calendarStart = dateStartMs(calendarEndDate) - 364 * 86_400_000;
+  const calendarStartDate = dateInputValue(calendarStart);
+  const calendarObservations = data.observations.filter((observation) => observation[0] >= calendarStart && observation[0] <= calendarEnd);
+  const dailyCounts = countObservationsByDay(calendarObservations);
+  const maxDailyCount = Math.max(0, ...dailyCounts.values());
+  const averageDailyCount = calendarObservations.length / Math.max(dailyCounts.size, 1);
   target.innerHTML = `<section class="detail-header"><div><p class="eyebrow">STATION DETAIL / 站点详情</p><div class="detail-title-row"><h1>${escapeHtml(station.name)}</h1><span class="river-tag">${escapeHtml(station.river)}</span></div><p class="station-code">站码 ${escapeHtml(station.id)} · 数据覆盖 ${formatDate(station.historyStart)} 至 ${formatDate(station.historyEnd)}</p></div><span class="freshness ${freshness(station.tm).className}"><i></i>${freshness(station.tm).label}</span></section>
     <section class="detail-metrics"><div class="metric-card accent"><small>当前水位</small><strong>${formatValue(station.z)} <em>m</em></strong><span>观测于 ${formatDate(station.tm)}</span></div><div class="metric-card"><small>当前流量</small><strong>${formatValue(station.q, 0)} <em>m³/s</em></strong><span>缺测点跳过，连接相邻有效观测</span></div><div class="metric-card"><small>当前出流量</small><strong>${formatValue(station.oq, 0)} <em>m³/s</em></strong><span>与流量分别记录和展示</span></div><div class="metric-card trend-card ${trend.className}"><small>水势趋势</small><strong>${trend.icon} ${trend.label}</strong><span>根据来源记录显示涨、落或平</span></div></section>
     <section class="chart-panel"><div class="chart-heading"><div><p class="eyebrow">TREND / 趋势</p><h2>观测变化趋势</h2><p class="chart-subtitle">${hasAnyFlow ? "水位单位 m；流量与出流量单位 m³/s" : "该站暂无流量观测，仅显示水位（m）"}</p></div><div class="range-controls" role="group" aria-label="图表时间范围"><button data-days="1">24小时</button><button class="selected" data-days="7">7天</button><button data-days="30">30天</button><button data-days="365">近一年</button></div></div><div class="chart-toolbar"><div class="custom-range"><label>开始日期<input id="range-start" type="date" /></label><span>—</span><label>结束日期<input id="range-end" type="date" /></label><button class="button small" id="apply-range">应用</button></div><span class="range-summary" id="range-summary">计算中…</span></div><div id="trend-chart" class="trend-chart" role="img" aria-label="站点水位和流量趋势图"></div><p class="chart-note"><span>可滚轮或双指缩放，拖动底部滑块查看时间范围。</span><span>缺测点不参与绘制，曲线连接相邻有效观测。</span></p></section>
-    <section class="calendar-panel"><div class="calendar-heading"><div><p class="eyebrow">COLLECTION / 采集日历</p><h2>每日数据采集活跃度</h2><p>颜色越深表示当天记录越多，悬浮日期可查看精确数量。</p></div><div class="calendar-stats"><div><strong>${data.observations.length.toLocaleString("zh-CN")}</strong><span>总记录</span></div><div><strong>${dailyCounts.size}</strong><span>有记录天数</span></div><div><strong>${formatValue(averageDailyCount, 1)}</strong><span>日均记录</span></div><div><strong>${maxDailyCount}</strong><span>单日最多</span></div></div></div><div class="calendar-scroll"><div id="collection-calendar" class="collection-calendar" role="img" aria-label="每日数据采集数量日历图"></div></div><p class="calendar-note">按北京时间自然日统计；空白日期表示当天没有采集记录。</p></section>`;
+    <section class="calendar-panel"><div class="calendar-heading"><div><p class="eyebrow">COLLECTION / 采集日历</p><h2>近一年数据采集日历</h2><p>${calendarStartDate} 至 ${calendarEndDate} · 颜色越深表示当天记录越多，悬浮可查看精确数量。</p></div><div class="calendar-stats"><div><strong>${calendarObservations.length.toLocaleString("zh-CN")}</strong><span>近一年记录</span></div><div><strong>${dailyCounts.size}</strong><span>有记录天数</span></div><div><strong>${formatValue(averageDailyCount, 1)}</strong><span>活跃日均记录</span></div><div><strong>${maxDailyCount}</strong><span>单日最多</span></div></div></div><div class="calendar-scroll"><div id="collection-calendar" class="collection-calendar" role="img" aria-label="近一年每日数据采集数量日历图"></div></div><p class="calendar-note">使用 ECharts 日历热力图，按北京时间自然日统计；灰色日期表示当天没有采集记录。</p></section>`;
   const chartElement = target.querySelector<HTMLElement>("#trend-chart");
   if (!chartElement) return;
   const chart = echarts.init(chartElement, undefined, { renderer: "canvas" });
   const calendarElement = target.querySelector<HTMLElement>("#collection-calendar");
   const calendarChart = calendarElement ? echarts.init(calendarElement, undefined, { renderer: "canvas" }) : null;
   if (calendarChart && calendarElement) {
-    drawCollectionCalendar(calendarChart, calendarElement, dailyCounts, station.historyStart, station.historyEnd);
+    drawCollectionCalendar(calendarChart, calendarElement, dailyCounts, calendarStart, calendarEnd);
   }
   const maxTm = Math.max(...data.observations.map((observation) => observation[0]));
   const state = { start: maxTm - 7 * 86_400_000, end: maxTm };
@@ -290,7 +295,9 @@ function renderDetail(root: HTMLElement, data: StationData, echarts: typeof impo
   });
   const resize = () => {
     chart.resize();
-    calendarChart?.resize();
+    if (calendarChart && calendarElement) {
+      drawCollectionCalendar(calendarChart, calendarElement, dailyCounts, calendarStart, calendarEnd);
+    }
   };
   window.addEventListener("resize", resize);
   draw();
@@ -342,21 +349,21 @@ function drawCollectionCalendar(
   chart: ECharts.ECharts,
   element: HTMLElement,
   counts: Map<string, number>,
-  historyStart: number,
-  historyEnd: number,
+  rangeStart: number,
+  rangeEnd: number,
 ): void {
-  const startDate = dateInputValue(historyStart);
-  const endDate = dateInputValue(historyEnd);
-  const start = dateStartMs(startDate);
-  const end = dateStartMs(endDate);
-  const days: Array<[string, number]> = [];
-  for (let timestamp = start; timestamp <= end; timestamp += 86_400_000) {
-    const day = dateInputValue(timestamp);
-    days.push([day, counts.get(day) ?? 0]);
-  }
-  const weekCount = Math.ceil(days.length / 7);
-  element.style.width = `${Math.max(900, weekCount * 16 + 88)}px`;
-  const maxCount = Math.max(1, ...counts.values());
+  const startDate = dateInputValue(rangeStart);
+  const endDate = dateInputValue(rangeEnd);
+  const containerWidth = element.parentElement?.clientWidth ?? 900;
+  const chartWidth = Math.max(900, containerWidth);
+  const cellSize = Math.max(14, Math.min(18, Math.floor((chartWidth - 82) / 54)));
+  element.style.width = `${chartWidth}px`;
+  element.style.height = `${58 + cellSize * 7}px`;
+  chart.resize();
+  const data = [...counts.entries()]
+    .filter(([day]) => day >= startDate && day <= endDate)
+    .sort(([left], [right]) => left.localeCompare(right));
+  const pieces = calendarVisualPieces(data.map(([, count]) => count));
   const option: ECharts.EChartsOption = {
     animation: false,
     tooltip: {
@@ -367,44 +374,61 @@ function drawCollectionCalendar(
       formatter: (params: unknown) => {
         const value = (params as { value?: [string, number] }).value;
         if (!value) return "";
-        return `${escapeHtml(value[0])}<br><b>${value[1].toLocaleString("zh-CN")}</b> 条记录`;
+        const [year, month, day] = value[0].split("-");
+        return `${year}年${Number(month)}月${Number(day)}日<br><b>${value[1].toLocaleString("zh-CN")}</b> 条记录`;
       },
     },
-    visualMap: {
-      min: 0,
-      max: maxCount,
-      calculable: false,
+    visualMap: pieces.length ? {
+      type: "piecewise",
+      pieces,
       orient: "horizontal",
       right: 12,
       top: 2,
-      itemWidth: 92,
-      itemHeight: 8,
-      text: ["多", "少"],
-      textGap: 7,
+      itemWidth: 11,
+      itemHeight: 11,
+      itemGap: 8,
+      selectedMode: false,
       textStyle: { color: "#778899", fontSize: 10 },
-      inRange: { color: ["#edf2f5", "#c7eee8", "#78d8ca", "#2cb9aa", "#0f766e"] },
-    },
+    } : undefined,
     calendar: {
       top: 43,
       left: 48,
       right: 18,
       bottom: 12,
       range: [startDate, endDate],
-      cellSize: [14, 14],
-      itemStyle: { color: "#edf2f5", borderColor: "#fff", borderWidth: 2 },
+      cellSize: [cellSize, cellSize],
+      itemStyle: { color: "#edf2f5", borderColor: "#fff", borderWidth: 2.5 },
       splitLine: { show: false },
       yearLabel: { show: false },
-      monthLabel: { nameMap: "ZH", color: "#64748b", fontSize: 10, margin: 9 },
+      monthLabel: { nameMap: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"], color: "#64748b", fontSize: 10, margin: 9 },
       dayLabel: { firstDay: 1, nameMap: ["日", "一", "二", "三", "四", "五", "六"], color: "#94a3b8", fontSize: 9 },
     },
     series: [{
       type: "heatmap",
       coordinateSystem: "calendar",
-      data: days,
+      data,
+      progressive: 0,
       emphasis: { itemStyle: { borderColor: "#0f766e", borderWidth: 1, shadowBlur: 0 } },
     } as ECharts.HeatmapSeriesOption],
   };
   chart.setOption(option, true);
+}
+
+function calendarVisualPieces(counts: number[]): Array<{ min: number; max: number; label: string; color: string }> {
+  if (!counts.length) return [];
+  const sorted = [...counts].sort((left, right) => left - right);
+  const quantile = (fraction: number) => sorted[Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * fraction))];
+  const cutoffs = [...new Set([quantile(0.25), quantile(0.5), quantile(0.75), sorted[sorted.length - 1]])]
+    .filter((value) => value > 0)
+    .sort((left, right) => left - right);
+  const colors = ["#c7eee8", "#78d8ca", "#2cb9aa", "#0f766e"];
+  let start = 1;
+  return cutoffs.map((end, index) => {
+    const colorIndex = cutoffs.length === 1 ? colors.length - 1 : Math.round(index * (colors.length - 1) / (cutoffs.length - 1));
+    const piece = { min: start, max: end, label: start === end ? `${end}` : `${start}–${end}`, color: colors[colorIndex] };
+    start = end + 1;
+    return piece;
+  });
 }
 
 async function renderAbout(root: HTMLElement): Promise<void> {
