@@ -1,0 +1,19 @@
+{
+  "name": "longriver-site",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite --host 127.0.0.1",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "echarts": "^5.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  }
+}
