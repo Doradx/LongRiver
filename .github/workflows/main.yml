@@ -2,6 +2,15 @@
 
 name: get-data
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
 on:
@@ -43,4 +52,41 @@ jobs:
       
     - name: Add & Commit
       uses: EndBug/add-and-commit@v10
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+        cache: npm
+        cache-dependency-path: site/package-lock.json
+
+    - name: Install site dependencies
+      run: npm ci
+      working-directory: site
+
+    - name: Build static site
+      run: npm run build
+      working-directory: site
+
+    - name: Generate browser data bundle
+      run: python site/scripts/build_site_data.py --input data --output .codex/outputs/pages/data
+
+    - name: Configure GitHub Pages
+      uses: actions/configure-pages@v5
+
+    - name: Upload GitHub Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: .codex/outputs/pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 

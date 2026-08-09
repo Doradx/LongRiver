@@ -3,3 +3,4 @@ crontab.log
 .codex-temp/
 .codex/
 __pycache__/
+site/node_modules/
