@@ -17,6 +17,11 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "site/**"
+      - "tests/**"
+      - "main.py"
+      - ".github/workflows/main.yml"
   schedule:
   - cron: "1/10 * * * *"
   workflow_dispatch:
@@ -48,12 +53,15 @@ jobs:
 
     # Runs a single command using the runners shell
     - name: Run main.py
+      if: github.event_name != 'push'
       run: python main.py
 
     - name: Check diff
+      if: github.event_name != 'push'
       run: git diff
       
     - name: Add & Commit
+      if: github.event_name != 'push'
       uses: EndBug/add-and-commit@v10
 
     - name: Setup Node.js
